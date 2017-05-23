@@ -8,9 +8,13 @@ document.addEventListener('click', (event) => {
   } else if (event.target.classList.contains('js-refresh-action')) {
     updateWeather()
   } else if (event.target.classList.contains('js-quit-action')) {
-    window.close()
+    ipcRenderer.send('system-event', "quit")
   }
 })
+
+const toTitleCase = (str) => {
+    return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+}
 
 const getGeoLocation = () => {
   return new Promise((resolve, reject) => {
@@ -19,14 +23,9 @@ const getGeoLocation = () => {
 }
 
 const getWeather = (position) => {
-  // FIXME replace with your own API key
-  // Register for one at https://darksky.net/dev/
-  const apiKey = '98cab43abdc8442a64255fc0a9f10b97'
-
-
   const location = `${position.coords.latitude},${position.coords.longitude}`
   console.log(`Getting weather for ${location}`)
-  const url = `https://api.forecast.io/forecast/${apiKey}/${location}`
+  const url = `https://shlmog4lwa.execute-api.eu-west-1.amazonaws.com/dev/datapoint?location=${location}`
 
   return window.fetch(url).then((response) => {
     return response.json()
@@ -34,57 +33,29 @@ const getWeather = (position) => {
 }
 
 const updateView = (weather) => {
-  const currently = weather.currently
+  const currently = weather.properties.forecast.current
 
-  document.querySelector('.js-summary').textContent = currently.summary
-  document.querySelector('.js-update-time').textContent = `at ${new Date(currently.time).toLocaleTimeString()}`
+  document.querySelector('.js-summary').textContent = currently.weatherType.value.description
+  document.querySelector('.js-update-time').textContent = `${new Date(currently.time).toLocaleTimeString()}`
+  document.querySelector('.js-location').textContent = toTitleCase(weather.properties.site.name)
 
-  document.querySelector('.js-temperature').textContent = `${Math.round(currently.temperature)}° F`
-  document.querySelector('.js-apparent').textContent = `${Math.round(currently.apparentTemperature)}° F`
+  document.querySelector('.js-temperature').textContent = `${Math.round(currently.temperature.value)}° C`
+  document.querySelector('.js-apparent').textContent = `${Math.round(currently.feelsLikeTemperature.value)}° C`
 
-  document.querySelector('.js-wind').textContent = `${Math.round(currently.windSpeed)} mph`
-  document.querySelector('.js-wind-direction').textContent = getWindDirection(currently.windBearing)
+  document.querySelector('.js-wind').textContent = `${Math.round(currently.windSpeed.value)} mph`
+  document.querySelector('.js-wind-direction').textContent = currently.windDirection.value
 
-  document.querySelector('.js-dewpoint').textContent = `${Math.round(currently.dewPoint)}° F`
-  document.querySelector('.js-humidity').textContent = `${Math.round(currently.humidity * 100)}%`
+  document.querySelector('.js-uv').textContent = `${Math.round(currently.maxUVIndex.value.index)}`
+  document.querySelector('.js-humidity').textContent = `${Math.round(currently.screenRelativeHumidity.value)}%`
 
-  document.querySelector('.js-visibility').textContent = `${Math.round(currently.windSpeed)} miles`
-  document.querySelector('.js-cloud-cover').textContent = `${Math.round(currently.cloudCover * 100)}%`
-
-  document.querySelector('.js-precipitation-chance').textContent = `${Math.round(currently.precipProbability * 100)}%`
-  document.querySelector('.js-precipitation-rate').textContent = currently.precipIntensity
-}
-
-const getWindDirection = (direction) => {
-  if (direction < 45) return 'NNE'
-  if (direction === 45) return 'NE'
-
-  if (direction < 90) return 'ENE'
-  if (direction === 90) return 'E'
-
-  if (direction < 135) return 'ESE'
-  if (direction === 135) return 'SE'
-
-  if (direction < 180) return 'SSE'
-  if (direction === 180) return 'S'
-
-  if (direction < 225) return 'SSW'
-  if (direction === 225) return 'SW'
-
-  if (direction < 270) return 'WSW'
-  if (direction === 270) return 'W'
-
-  if (direction < 315) return 'WNW'
-  if (direction === 315) return 'NW'
-
-  if (direction < 360) return 'NNW'
-  return 'N'
+  document.querySelector('.js-visibility').textContent = `${currently.visibility.value.description.split("-")[0].trim()}`
+  document.querySelector('.js-precipitation-chance').textContent = `${currently.precipitationProbability.value}%`
 }
 
 const updateWeather = () => {
   getGeoLocation().then(getWeather).then((weather) => {
     // Use local time
-    weather.currently.time = Date.now()
+    weather.properties.forecast.current.time = Date.now()
 
     console.log('Got weather', weather)
 
